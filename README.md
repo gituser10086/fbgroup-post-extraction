@@ -1,4 +1,4 @@
-# FB Group 帖子采集器 — Chrome 扩展
+# FB Group 帖子采集器 — Chrome Extension
 
 ## 功能介绍
 
