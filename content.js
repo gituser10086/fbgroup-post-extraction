@@ -134,6 +134,7 @@
 
         const post = extractPost(item, timeEl);
         if (!post || !post.content) return;
+        if (isFilteredPost(post.content)) return;
 
         const key = (post.author + post.content.slice(0, 40)).replace(/\s/g, '');
         if (seen.has(key)) return;
@@ -189,6 +190,7 @@
     }
 
     if (!content || content.length < 5) return null;
+    if (isFilteredPost(content)) return null;
 
     const statsText = el.innerText;
     const likes    = parseCount(statsText, /(\d[\d,.]*)\s*(个?人?(赞|Likes?|reactions?|❤|👍))/i) ||
@@ -215,6 +217,16 @@
     const m = text.match(regex);
     if (!m) return 0;
     return parseInt(m[group].replace(/[,，]/g, ''), 10) || 0;
+  }
+
+  function isFilteredPost(content) {
+    const banned = Array.isArray(window.FB_SCRAPER_FILTER_KEYWORDS)
+      ? window.FB_SCRAPER_FILTER_KEYWORDS
+      : (typeof FB_SCRAPER_FILTER_KEYWORDS !== 'undefined' && Array.isArray(FB_SCRAPER_FILTER_KEYWORDS)
+          ? FB_SCRAPER_FILTER_KEYWORDS
+          : []);
+    const normalized = content.toLowerCase();
+    return banned.some((word) => typeof word === 'string' && normalized.includes(word.toLowerCase()));
   }
 
   function getGroupName() {

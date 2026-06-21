@@ -19,7 +19,7 @@
   "content_scripts": [
     {
       "matches": ["https://www.facebook.com/groups/*"],
-      "js": ["content.js"],
+      "js": ["filter-keywords.js", "content.js"],
       "run_at": "document_idle"
     }
   ],
