@@ -1,10 +1,14 @@
-# FB Group 帖子采集器 — Chrome Extension
+# FB Group post extraction — Chrome Extension
 
-## 功能介绍
+## Features to add
 
-在 Facebook Group 页面一键抓取帖子，调用 Claude AI 自动解析结构化字段，支持导出 JSON / CSV / TXT。
+1. 喂给AI前提前过滤掉包含关键字的帖子，比如volunteer, unpaid
 
-**提取字段：** 作者、时间、正文、帖子类型（出售/求购/分享/公告）、价格、地点、点赞/评论/分享数、关键词、AI 摘要、帖子链接
+## Function
+
+在 Facebook Group 页面一键抓取帖子，调用 AI API 自动解析结构化字段，支持导出 JSON / CSV / TXT。
+
+**提取字段：** 作者、时间、正文、点赞/评论/分享数、关键词、AI 摘要、帖子链接、自定义
 
 ---
 
@@ -59,19 +63,10 @@ fb-scraper-extension/
 ## 注意事项
 
 - **本扩展仅供个人学习研究使用**，请勿大规模采集或商业用途，遵守 Facebook 服务条款
-- AI 解析需要 Anthropic API Key（按 token 计费，成本很低）
+- AI 解析需要 API Key
 - Facebook 页面结构频繁更新，若采集结果为空，可尝试刷新页面后重试
 - 采集结果缓存在本地浏览器存储中，关闭弹窗不会丢失
 
 ---
 
 ## 常见问题
-
-**Q: 点击采集帖子但没有结果？**  
-A: 确认当前页面是 `facebook.com/groups/` 开头，且页面已加载完成。可尝试增加「自动滚动」次数让更多内容加载。
-
-**Q: AI 解析报错 "API 错误 401"？**  
-A: API Key 填写有误，请检查并重新保存。
-
-**Q: 采集到的帖子缺少作者或时间？**  
-A: Facebook 页面结构因账号、语言、A/B 测试会有差异，部分字段可能解析不到，正文内容一般都能正常提取。
