@@ -3,14 +3,22 @@
 let posts = [];       // 当前已采集的全部帖子
 let display = [];     // 筛选后展示的帖子
 let currentUrl = '';
+let geminiFilter = null;  // Gemini 过滤器实例
 
 const $ = id => document.getElementById(id);
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
-  const stored = await chrome.storage.local.get(['maxPosts', 'scrollTimes']);
+  const stored = await chrome.storage.local.get(['maxPosts', 'scrollTimes', 'aiEnabled', 'apiKey', 'filterType', 'confidenceThreshold']);
   if (stored.maxPosts)    $('max-posts').value    = stored.maxPosts;
   if (stored.scrollTimes !== undefined) $('scroll-times').value = stored.scrollTimes;
+  if (stored.aiEnabled)   $('ai-enable').checked = stored.aiEnabled;
+  if (stored.apiKey)      $('api-key').value = stored.apiKey;
+  if (stored.filterType)  $('filter-type-input').value = stored.filterType;
+  if (stored.confidenceThreshold) $('confidence-threshold').value = stored.confidenceThreshold;
+
+  // AI 设置事件监听
+  setupAISettings();
 
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   const isFb = tab && /facebook\.com\/groups\//.test(tab.url);
@@ -41,6 +49,139 @@ document.addEventListener('DOMContentLoaded', async () => {
     $('export-bar').classList.add('on');
   }
 });
+
+// ── AI 设置 ────────────────────────────────────────────────────────────────
+async function setupAISettings() {
+  const aiEnable = $('ai-enable');
+  const aiOptions = $('ai-options');
+  const apiKey = $('api-key');
+    const filterInput = $('filter-type-input');
+    const filterHistoryList = $('filter-history');
+  const confidence = $('confidence-threshold');
+
+  // 切换 AI 开关
+  aiEnable.addEventListener('change', async (e) => {
+    if (e.target.checked && !apiKey.value.trim()) {
+      setStatus('error', '请先输入 Gemini API 密钥');
+      e.target.checked = false;
+      return;
+    }
+    aiOptions.classList.toggle('active', e.target.checked);
+    await chrome.storage.local.set({ aiEnabled: e.target.checked });
+  });
+
+  // 保存 API 密钥
+  apiKey.addEventListener('change', async (e) => {
+    const key = e.target.value.trim();
+    await chrome.storage.local.set({ apiKey: key });
+    if (key) {
+      geminiFilter = new GeminiPostFilter(key);
+      validateApiKey();
+    }
+  });
+
+    // 保存过滤类型（用户自定义，保存历史）
+    filterInput.addEventListener('change', async (e) => {
+      const v = (e.target.value || '').trim();
+      if (!v) return;
+      // save as current filter
+      await chrome.storage.local.set({ filterType: v });
+
+      // update history
+      const sto = await chrome.storage.local.get(['filterTypeHistory']);
+      let history = Array.isArray(sto.filterTypeHistory) ? sto.filterTypeHistory : [];
+      // remove duplicates
+      history = history.filter(h => h !== v);
+      history.unshift(v);
+      // limit history length
+      if (history.length > 10) history = history.slice(0, 10);
+      await chrome.storage.local.set({ filterTypeHistory: history });
+      // refresh datalist
+      renderFilterHistory(history);
+  });
+
+  // 保存置信度
+  confidence.addEventListener('change', async (e) => {
+    await chrome.storage.local.set({ confidenceThreshold: parseFloat(e.target.value) });
+  });
+
+  // 初始化 AI 选项显示
+  if (aiEnable.checked) {
+    aiOptions.classList.add('active');
+    if (apiKey.value) {
+      geminiFilter = new GeminiPostFilter(apiKey.value);
+    }
+  }
+  
+    // 载入历史过滤项
+    const initSto = await chrome.storage.local.get(['filterTypeHistory', 'filterType']);
+    const initHistory = Array.isArray(initSto.filterTypeHistory) ? initSto.filterTypeHistory : [];
+    renderFilterHistory(initHistory);
+    if (initSto.filterType) filterInput.value = initSto.filterType;
+}
+
+  function renderFilterHistory(history) {
+    const el = document.getElementById('filter-history');
+    if (!el) return;
+    el.innerHTML = history.map(h => `<option value="${esc(h)}">`).join('');
+  }
+// 验证 API 密钥
+async function validateApiKey() {
+  const status = $('api-status');
+  const apiKey = $('api-key');
+  const key = apiKey.value.trim();
+
+  if (!key) {
+    status.textContent = '';
+    return;
+  }
+
+  status.textContent = '验证中...';
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: 'test' }] }],
+          generationConfig: { maxOutputTokens: 10 },
+        }),
+      }
+    );
+
+    if (response.ok) {
+      status.className = 'api-status valid';
+      status.textContent = 'API 密钥有效';
+      geminiFilter = new GeminiPostFilter(key);
+    } else {
+      status.className = 'api-status invalid';
+      status.textContent = 'API 密钥无效或超出配额';
+    }
+  } catch (error) {
+    status.className = 'api-status invalid';
+    status.textContent = '网络错误：' + error.message;
+  }
+}
+
+// 应用 AI 过滤
+async function applyAIFilter(postsToFilter) {
+  if (!$('ai-enable').checked || !geminiFilter) return postsToFilter;
+
+  const filterType = ($('filter-type-input').value || '').trim();
+  const threshold = parseFloat($('confidence-threshold').value) || 0.7;
+
+  try {
+    setStatus('loading', `正在用 AI 分析 ${postsToFilter.length} 条帖子...`);
+    const filtered = await geminiFilter.filterPosts(postsToFilter, filterType, threshold);
+    setStatus('success', `AI 过滤完成：${filtered.length} 条符合条件的帖子`);
+    return filtered;
+  } catch (error) {
+    setStatus('error', 'AI 过滤失败：' + error.message);
+    return postsToFilter;
+  }
+}
+
 
 // ── 采集（清空后重新抓） ──────────────────────────────────────────────────────
 $('scrape-btn').addEventListener('click', () => runScrape(false));
@@ -76,7 +217,12 @@ async function runScrape(append) {
 
     setStatus('loading', '提取帖子内容...');
     const result = await msg(tab.id, { action: 'scrape', options: { maxPosts } });
-    const fresh = result.posts || [];
+    let fresh = result.posts || [];
+
+    // 应用 AI 过滤
+    if ($('ai-enable').checked && geminiFilter) {
+      fresh = await applyAIFilter(fresh);
+    }
 
     if (append && posts.length > 0) {
       // 去重合并：用 author+内容前50字 作 key
@@ -180,6 +326,7 @@ function render(list) {
     const init = (p.author || '?').replace(/\s+/g, '').slice(0, 2).toUpperCase();
     const preview = (p.content || '').slice(0, 100);
     const hasLink = !!p.permalink;
+    const aiTag = p.aiFilter ? `<span class="stat" title="AI 置信度: ${(p.aiFilter.confidence * 100).toFixed(0)}%">🤖 ${(p.aiFilter.confidence * 100).toFixed(0)}%</span>` : '';
 
     html += `<div class="post" onclick="openLink(${i})">
       <div class="phead">
@@ -202,6 +349,7 @@ function render(list) {
           ${p.shares || 0}
         </span>
         ${p.images && p.images.length ? `<span class="stat">🖼 ${p.images.length}</span>` : ''}
+        ${aiTag}
         ${hasLink ? `<span class="permalink" onclick="event.stopPropagation();openLink(${i})">跳转 ↗</span>` : ''}
       </div>
     </div>`;
