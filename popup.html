@@ -89,6 +89,20 @@ select:focus,input[type=number]:focus{border-color:var(--blue)}
 .notfb{padding:28px 20px;text-align:center;color:var(--text2);font-size:13px;line-height:1.7}
 .notfb svg{width:38px;height:38px;opacity:.22;display:block;margin:0 auto 10px}
 .notfb strong{color:var(--text);display:block;margin-bottom:4px;font-size:14px}
+.ai-settings{padding:10px 16px;background:var(--blue-bg);border-bottom:0.5px solid rgba(24,119,242,.2);flex-shrink:0}
+.ai-toggle{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.ai-toggle input[type=checkbox]{width:18px;height:18px;cursor:pointer;accent-color:var(--blue)}
+.ai-toggle label{cursor:pointer;font-size:13px;font-weight:500;color:var(--blue-text);flex:1}
+.ai-options{display:none;gap:8px;flex-direction:column;padding-top:6px;border-top:0.5px solid rgba(24,119,242,.2)}
+.ai-options.active{display:flex}
+.ai-options .srow{flex-direction:column;gap:4px}
+.ai-options .slabel{font-size:11px;color:var(--blue-text);font-weight:500}
+.ai-options input[type=password]{width:100%;padding:5px 8px;font-size:12px;border:0.5px solid rgba(24,119,242,.3);border-radius:6px;background:#fff;color:var(--text);outline:none}
+.ai-options input[type=password]:focus{border-color:var(--blue)}
+.ai-options select{width:100%;padding:5px 8px;font-size:12px;border:0.5px solid rgba(24,119,242,.3);border-radius:6px;background:#fff;color:var(--text)}
+.api-status{font-size:11px;color:var(--blue-text);margin-top:4px}
+.api-status.valid::before{content:"✓ ";color:var(--green)}
+.api-status.invalid::before{content:"✗ ";color:var(--red)}
 </style>
 </head>
 <body>
@@ -118,6 +132,31 @@ select:focus,input[type=number]:focus{border-color:var(--blue)}
         <option value="10">10次</option>
         <option value="20">20次</option>
       </select>
+    </div>
+  </div>
+
+  <div class="ai-settings">
+    <div class="srow">
+      <span class="slabel">Gemini API 密钥</span>
+      <input type="password" id="api-key" placeholder="输入你的 API 密钥...">
+      <div class="api-status" id="api-status"></div>
+    </div>
+
+    <div class="ai-toggle">
+      <input type="checkbox" id="ai-enable">
+      <label for="ai-enable">🤖 启用 AI 智能过滤 (Gemini)</label>
+    </div>
+
+    <div class="ai-options" id="ai-options">
+      <div class="srow">
+        <span class="slabel">过滤关键词 / 类型（可自定义）</span>
+        <input list="filter-history" id="filter-type-input" placeholder="输入过滤关键词并回车保存">
+        <datalist id="filter-history"></datalist>
+      </div>
+      <div class="srow">
+        <span class="slabel">置信度 (0.0-1.0)</span>
+        <input type="number" id="confidence-threshold" value="0.7" min="0" max="1" step="0.1" style="width:80px">
+      </div>
     </div>
   </div>
 
@@ -164,6 +203,7 @@ select:focus,input[type=number]:focus{border-color:var(--blue)}
   </div>
 </div>
 
+<script src="gemini-filter.js"></script>
 <script src="popup.js"></script>
 </body>
 </html>
